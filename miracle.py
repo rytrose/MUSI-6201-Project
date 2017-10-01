@@ -1,6 +1,6 @@
 import pyaudio
 import numpy as np
-from matplotlib import pyplot as plt
+# from matplotlib import pyplot as plt
 from python_speech_features import mfcc
 # import librosa
 import threading
