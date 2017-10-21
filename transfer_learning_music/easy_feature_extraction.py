@@ -8,6 +8,7 @@ import keras
 import kapre
 import multiprocessing
 import pyaudio
+import time
 
 SR = 12000  # [Hz]
 LEN_SRC = 29.  # [second]
@@ -42,10 +43,6 @@ def load_audio(audio_path):
         return new_src[np.newaxis, np.newaxis, :]
     else:
         return src[np.newaxis, np.newaxis, :ref_n_src]
-
-
-def load_realtime_audio():
-    return
 
 
 def _paths_models_generator(lines, models):
@@ -96,13 +93,60 @@ def realtime():
     predict_buffer = np.zeros(ref_n_src)
     data = 'init'
 
-    while data != '':
+    times = []
+    # while data != '':
+    for i in range(20):
         data = stream.read(CHUNKSIZE, exception_on_overflow=False)
         numpydata = np.fromstring(data, dtype=np.float32)
 
         predict_buffer = np.concatenate([numpydata, predict_buffer[CHUNKSIZE:]])
+
+        t0 = time.time()
         features = [models[i].predict(predict_buffer[np.newaxis, np.newaxis, :ref_n_src])[0] for i in range(5)]
+        times.append(time.time() - t0)
+        print("Time to extract convnet features: " + str(time.time() - t0))
         print np.concatenate(features, axis=0)
+
+    np.savetxt("times.csv", times, delimiter=",")
+
+def baseline(txt_path):
+    models = [load_model(mid_idx) for mid_idx in range(5)]  # for five models...
+
+    features = []
+    with open(txt_path) as f_path:
+        paths = f_path.readlines()
+        for path in paths:
+            audio_path = path.rstrip('\n')
+            name = audio_path.split('/')[-1]
+
+            arousal = []
+            valence = []
+
+            # Read file
+            src, sr = librosa.load(audio_path, sr=SR)
+
+            index = 0
+            while(index < len(src)):
+                # Get the next 500ms
+                sample = src[index:min(len(src) - 1, index + ((SR / 2) - 1))]
+                index += (SR / 2)
+
+                # Repeat
+                repeatTimes = floor((SR * LEN_SRC)/ len(sample))
+                data = np.tile(sample, repeatTimes)
+
+                # Ensure it's the correct size
+                predict_buffer = np.zeros(ref_n_src)
+                predict_buffer = np.concatenate([data, predict_buffer[len(data):]])
+
+                # Feature extract
+                features = [models[i].predict(predict_buffer[np.newaxis, np.newaxis, :ref_n_src])[0] for i in range(5)]
+
+                arousal.append(features[0])
+                arousal.append(features[1])
+
+            np.save('output/' + name + '_arousal.npy', arousal)
+            np.save('output/' + name + '_valence.npy', valence)
 
 
 def warning():
