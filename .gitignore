@@ -2,6 +2,8 @@ DEAM_annotations/
 DEAM_audio/
 svm/full_one_sec/
 svm/subset/ 
+transfer_learning_music/.ipynb_checkpoints/
+svm/models_1/
 
 # Windows image file caches
 Thumbs.db
