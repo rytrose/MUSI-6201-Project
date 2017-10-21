@@ -1,3 +1,8 @@
+DEAM_annotations/
+DEAM_audio/
+svm/full_one_sec/
+svm/subset/ 
+
 # Windows image file caches
 Thumbs.db
 ehthumbs.db

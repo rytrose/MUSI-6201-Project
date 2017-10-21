@@ -8,6 +8,7 @@ import keras
 import kapre
 import multiprocessing
 import pyaudio
+import scipy
 
 SR = 12000  # [Hz]
 LEN_SRC = 29.  # [second]
@@ -27,7 +28,7 @@ def load_model(mid_idx):
                      n_mels=96, trainable_fb=False, trainable_kernel=False,
                      conv_until=mid_idx)
     model = build_convnet_model(args, last_layer=False)
-    model.load_weights('weights_transfer/weights_layer{}_{}.hdf5'.format(mid_idx, K._backend),
+    model.load_weights('../transfer_learning_music/weights_transfer/weights_layer{}_{}.hdf5'.format(mid_idx, K._backend),
                        by_name=True)
     return model
 
@@ -44,6 +45,15 @@ def load_audio(audio_path):
         return src[np.newaxis, np.newaxis, :ref_n_src]
 
 
+def audio_format(src):
+    len_src = len(src)
+    if len_src < ref_n_src:
+        new_src = np.zeros(ref_n_src)
+        new_src[:len_src] = src
+        return new_src[np.newaxis, np.newaxis, :]
+    else:
+        return src[np.newaxis, np.newaxis, :ref_n_src]
+
 def load_realtime_audio():
     return
 
@@ -51,7 +61,6 @@ def load_realtime_audio():
 def _paths_models_generator(lines, models):
     for line in lines:
         yield (line.rstrip('\n'), models)
-
 
 def _predict_one(args):
     """target function in pool.map()"""
@@ -101,8 +110,16 @@ def realtime():
         numpydata = np.fromstring(data, dtype=np.float32)
 
         predict_buffer = np.concatenate([numpydata, predict_buffer[CHUNKSIZE:]])
-        features = [models[i].predict(predict_buffer[np.newaxis, np.newaxis, :ref_n_src])[0] for i in range(5)]
-        print np.concatenate(features, axis=0)
+        
+
+def calc(one_sec, num_secs):
+    models = [load_model(mid_idx) for mid_idx in range(5)]  # for five models...
+
+    numpydata = scipy.signal.resample(one_sec, int(round(num_secs * SR)))
+
+    features_15 = [models[i].predict(audio_format(numpydata))[0] for i in [0, 4]]
+    features_235 = [models[i].predict(audio_format(numpydata))[0] for i in [1, 2, 4]]
+    return features_15, features_235
 
 
 def warning():
@@ -123,9 +140,9 @@ def warning():
 if __name__ == '__main__':
     warning()
 
-    txt_path = sys.argv[1]
-    out_path = sys.argv[2]
-    n_jobs = int(sys.argv[3])
+    #txt_path = sys.argv[1]
+    #out_path = sys.argv[2]
+    #n_jobs = int(sys.argv[3])
 
     realtime()
     # main(txt_path, out_path, n_jobs)
