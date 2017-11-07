@@ -2,13 +2,14 @@ import librosa
 import numpy as np
 import os
 import cPickle as pickle
+import matplotlib.pyplot as plt
 
 PATH_TO_AUDIO = os.path.abspath(os.path.join('.', os.pardir)) + '/DEAM_audio'
 filenames = pickle.load( open( "full_one_sec/filename.p", "rb" ) )  # shape (song no)
 arousal = pickle.load( open( "full_one_sec/arousal.p", "rb" ) ) #shape (song no, second index)
 valence = pickle.load( open( "full_one_sec/valence.p", "rb" ) ) #shape (song no, second index)
-
-
+arousal_mean = pickle.load( open( "arousal_mean.p", "rb" ) ) #shape (song no, second index)
+valence_mean = pickle.load( open( "valence_mean.p", "rb" ) ) #shape (song no, second index)
 
 def prepare_audio(names):
     songs = {}
@@ -24,7 +25,7 @@ def prepare_audio(names):
 
     pickle.dump(songs, open("full_one_sec/audio.p", "wb"))
 
-prepare_audio(filenames)
+# prepare_audio(filenames)
 
 
 
@@ -98,3 +99,64 @@ def associateLabels(trimmed_timestamps, label_timestamps, song_arousal, song_val
 #     print len(split), len(ar), len(va)
 #
 # librosa.output.write_wav( os.path.abspath('.') + '/fuck_MIR.wav', np.array(split[5]), sr)
+
+def plotValenceArousal():
+
+    for i in range(len(filenames)):
+        aro = np.array(arousal[i])
+        val = np.array(valence[i])
+
+        plt.xlabel('Valence')
+        plt.ylabel('Arousal')
+        plt.title('Valence/Arousal of ' + str(filenames[i]))
+        plt.plot(val, aro, 'ro')
+        plt.axis([-1, 1, -1, 1])
+        plt.savefig('full_one_sec/val_aro_plots/' + filenames[i][:-4] + '_val_aro_plot.png')
+        plt.gcf().clear()
+        print 'Finished ' + str(i) + ' out of ' + str(len(filenames))
+
+
+# plotValenceArousal()
+
+def aggregateValues(inputValues, outputFilename):
+    aggregated = np.zeros(len(inputValues))
+
+    for i in range(len(inputValues)):
+        values = np.array(inputValues[i])
+        mean = np.mean(values)
+        aggregated[i] = mean
+
+    print len(inputValues)
+    print aggregated.shape
+    pickle.dump(aggregated, open(outputFilename + ".p", "wb"))
+
+# aggregateValues(arousal, "arousal_mean")
+# aggregateValues(valence, "valence_mean")
+
+def getBalancedFiles(numberFilesPerDimPerBin):
+    arousal_n, arousal_bins, arousal_patches = plt.hist(np.array(arousal_mean))
+    valence_n, valence_bins, valence_patches = plt.hist(np.array(valence_mean))
+
+    indices = np.arange(len(filenames))
+    np.random.shuffle(indices)
+
+    numBins = len(arousal_bins - 1)
+    arousal_files = [[] for i in range(numBins - 1)]
+    valence_files = [[] for i in range(numBins - 1)]
+
+    i = 0
+    while i < len(indices):
+        aro_bin_i = np.digitize(arousal_mean[indices[i]], arousal_bins[:-1]) - 1
+        val_bin_i = np.digitize(valence_mean[indices[i]], valence_bins[:-1]) - 1
+
+        if len(arousal_files[aro_bin_i]) < numberFilesPerDimPerBin:
+            arousal_files[aro_bin_i].append(filenames[indices[i]])
+
+        if len(valence_files[val_bin_i]) < numberFilesPerDimPerBin:
+            valence_files[val_bin_i].append(filenames[indices[i]])
+        i += 1
+
+    return arousal_files, valence_files
+
+
+# print getBalancedFiles(2)
