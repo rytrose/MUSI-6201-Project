@@ -133,7 +133,16 @@ def aggregateValues(inputValues, outputFilename):
 # aggregateValues(arousal, "arousal_mean")
 # aggregateValues(valence, "valence_mean")
 
-def getBalancedFiles(numberFilesPerDimPerBin):
+def getBalancedFiles(numberFilesPerDimPerBin, exclude=[]):
+    exclude_files = -1
+    while exclude_files == -1:
+        exclude = [item for items in exclude for item in items]
+        try:
+            exclude_files = set(exclude)
+        except:
+            print "flattened"
+
+
     arousal_n, arousal_bins, arousal_patches = plt.hist(np.array(arousal_mean))
     valence_n, valence_bins, valence_patches = plt.hist(np.array(valence_mean))
 
@@ -149,14 +158,18 @@ def getBalancedFiles(numberFilesPerDimPerBin):
         aro_bin_i = np.digitize(arousal_mean[indices[i]], arousal_bins[:-1]) - 1
         val_bin_i = np.digitize(valence_mean[indices[i]], valence_bins[:-1]) - 1
 
-        if len(arousal_files[aro_bin_i]) < numberFilesPerDimPerBin:
+        if len(arousal_files[aro_bin_i]) < numberFilesPerDimPerBin and (not filenames[indices[i]] in exclude_files):
             arousal_files[aro_bin_i].append(filenames[indices[i]])
 
-        if len(valence_files[val_bin_i]) < numberFilesPerDimPerBin:
+        if len(valence_files[val_bin_i]) < numberFilesPerDimPerBin and (not filenames[indices[i]] in exclude_files):
             valence_files[val_bin_i].append(filenames[indices[i]])
         i += 1
 
     return arousal_files, valence_files
 
 
-# print getBalancedFiles(2)
+# l1, l2 = getBalancedFiles(2)
+# print l1, l2
+# l3, l4 = getBalancedFiles(2, [l1, l2])
+# print l3, l4
+# print getBalancedFiles(2, [l1, l2, l3, l4])
