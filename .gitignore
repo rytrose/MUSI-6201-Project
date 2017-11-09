@@ -5,6 +5,9 @@ svm/subset/
 transfer_learning_music/.ipynb_checkpoints/
 svm/models_1/
 .idea/*
+svm/.ipynb_checkpoints
+*.pyc
+svm/train_test_sets
 
 # Windows image file caches
 Thumbs.db

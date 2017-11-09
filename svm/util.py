@@ -11,7 +11,7 @@ valence = pickle.load( open( "full_one_sec/valence.p", "rb" ) ) #shape (song no,
 arousal_mean = pickle.load( open( "arousal_mean.p", "rb" ) ) #shape (song no, second index)
 valence_mean = pickle.load( open( "valence_mean.p", "rb" ) ) #shape (song no, second index)
 
-def prepare_audio(names):
+def prepare_audio(names, path="full_one_sec/audio.p"):
     songs = {}
 
     for i, filename in enumerate(names):
@@ -23,18 +23,21 @@ def prepare_audio(names):
         if sr != 22050:
             print '!!!!!!!!WARNING: SR is', str(sr), 'NOT 22050:', filename
 
-    pickle.dump(songs, open("full_one_sec/audio.p", "wb"))
-
-# prepare_audio(filenames)
+    pickle.dump(songs, open(path, "wb"))
 
 
 
 # Takes in a filename of a song in DEAM dataset (all filenames are in filename.p)
 # Takes in a split length (in seconds) to divide the song into chunks of that size
 # Returns the audio chunks that have associated valence and arousal values from the DEAM data set
-def split_audio(filename, split_length_in_seconds):
-    y, sr = librosa.load(PATH_TO_AUDIO + '/' + filename)
-    song_array = np.array(y)
+def split_audio(filename, split_length_in_seconds, audio=None):
+    if(not audio is None):
+        song_array = audio
+        sr = 22050
+    else:
+        y, sr = librosa.load(PATH_TO_AUDIO + '/' + filename)
+        song_array = np.array(y)
+
     num_samps = len(song_array)
     slice_length_in_samps = int(round(split_length_in_seconds * sr))
     extra_samps = num_samps % slice_length_in_samps
@@ -62,6 +65,20 @@ def split_audio(filename, split_length_in_seconds):
     final_arousal, final_valence = associateLabels(trimmed_timestamps, label_timestamps, song_arousal, song_valence)
 
     return trimmed_split, final_arousal, final_valence
+
+# split each file fn in input_filenames with split_audio(fn, split_length_in_seconds)
+# and returns splits, arousal, valence
+def split_set(input_filenames, split_length_in_seconds, audio):
+    split = []
+    arousal = []
+    valence = []
+    for filename in input_filenames:
+        this_split, this_arousal, this_valence = split_audio(filename, split_length_in_seconds, audio[filename])
+        split.extend(this_split)
+        arousal.extend(this_arousal)
+        valence.extend(this_valence)
+    return split, arousal, valence
+
 
 def trim_song_timestamps(split, timestamps, label_timestamps):
     trimmed_split = []
@@ -167,9 +184,56 @@ def getBalancedFiles(numberFilesPerDimPerBin, exclude=[]):
 
     return arousal_files, valence_files
 
+# abstract the level of list one level turns [[[1],[2]],[[3],[4]]] -> [[1],[2],[3],[4]]
+def abstract_list(the_list):
+    flat_list = [item for sublist in the_list for item in sublist]
+    return flat_list
+
+# creates train_set using getBalancedFiles(num_train) and test set using getBalancedFiles(num_test, train_set)
+# outputs audio.p using
+def make_train_and_test_sets(num_train, num_test, path="train_test_sets/"):
+    train_arousal_filenames, train_valence_filenames = getBalancedFiles(num_train)
+    test_arousal_filenames, test_valence_filenames = getBalancedFiles(num_test, [train_arousal_filenames, train_valence_filenames])
+
+    train_arousal_filenames = abstract_list(train_arousal_filenames)
+    train_valence_filenames = abstract_list(train_valence_filenames)
+    test_arousal_filenames = abstract_list(test_arousal_filenames)
+    test_valence_filenames = abstract_list(test_valence_filenames)
+
+    files = set(train_arousal_filenames + train_valence_filenames + test_arousal_filenames + test_valence_filenames)
+    audio = {}
+    for i, file in enumerate(files):
+        y, sr = librosa.load("../DEAM_audio/" + file)
+        audio[file] = np.array(y)
+        print "loaded " + str(i) + " of " + str(len(files))
+
+    dir_name = "train-" + str(num_train) + "_test-" + str(num_test) + "/"
+    os.mkdir(path + dir_name)
+
+    pickle.dump(audio, open(path + dir_name + "audio.p", "wb"))
+    pickle.dump(train_arousal_filenames, open(path + dir_name + "train_arousal_filenames.p", "wb"))
+    pickle.dump(train_valence_filenames, open(path + dir_name + "train_valence_filenames.p", "wb"))
+    pickle.dump(test_arousal_filenames, open(path + dir_name + "test_arousal_filenames.p", "wb"))
+    pickle.dump(test_valence_filenames, open(path + dir_name + "test_valence_filenames.p", "wb"))
+
+# prepare_audio(filenames)
 
 # l1, l2 = getBalancedFiles(2)
 # print l1, l2
 # l3, l4 = getBalancedFiles(2, [l1, l2])
 # print l3, l4
 # print getBalancedFiles(2, [l1, l2, l3, l4])
+
+def calcMFCCs(audio):
+    final_feature = []
+    for section in audio:
+        mfcc = librosa.feature.mfcc(np.array(section), 22050, n_mfcc=20)
+        dmfcc = mfcc[:, 1:] - mfcc[:, :-1]
+        ddmfcc = dmfcc[:, 1:] - dmfcc[:, :-1]
+        mfcc_feature = np.concatenate(
+            (np.mean(mfcc, axis=1), np.std(mfcc, axis=1),  # mfcc feature taken from transfer learning paper
+             np.mean(dmfcc, axis=1), np.std(dmfcc, axis=1),
+             np.mean(ddmfcc, axis=1), np.std(ddmfcc, axis=1)), axis=0)
+        final_feature.append(mfcc_feature)
+
+    return final_feature
