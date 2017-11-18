@@ -65,6 +65,7 @@ pipe = Pipeline(estimators)
 num_examples = len(flat_mfcc)
 subset_id = round(num_examples/10)# index for subset of data used for testing
 
-clf = GridSearchCV(pipe, params, cv=None, n_jobs=n_jobs, pre_dispatch='8*n_jobs', verbose=10).fit(flat_mfcc, flat_arousal)
+clf = GridSearchCV(pipe, params, cv=None, n_jobs=n_jobs, pre_dispatch='8*n_jobs', verbose=10)
+clf.fit(flat_mfcc, flat_arousal)
 filename = 'arousal_test_2.sav'
 pickle.dump(clf, open(filename, 'wb'))
