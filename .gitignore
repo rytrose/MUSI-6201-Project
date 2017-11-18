@@ -5,6 +5,7 @@ svm/subset/
 transfer_learning_music/.ipynb_checkpoints/
 svm/models_1/
 .idea/*
+web/bower_components/
 
 # Windows image file caches
 Thumbs.db
