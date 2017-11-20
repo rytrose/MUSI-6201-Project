@@ -5,7 +5,7 @@ svm/full_one_sec/
 svm/subset/ 
 transfer_learning_music/.ipynb_checkpoints/
 svm/models_1/
-.idea/*
+.idea/
 web/bower_components/
 svm/.ipynb_checkpoints
 *.pyc
