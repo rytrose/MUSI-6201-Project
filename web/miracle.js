@@ -14,10 +14,16 @@ port.open();
 
 chart = new Highcharts.chart('graph', {
     chart: {
-        type: 'scatter'
+        type: 'scatter',
+        animation: {
+        	duration: 200
+        }
     },
     title: {
-        text: 'Real Time Mood'
+        text: 'Musical Mood Detection',
+        style: {
+        	"fontSize": "32px"
+        }
     },
     plotOptions: {
 	    scatter: {
@@ -57,7 +63,7 @@ chart = new Highcharts.chart('graph', {
     }]
 });
 
-var setDot = function(x, y, confidence) {
+var setDot = function(time, valence, arousal, confidence) {
 	// chart.plotOptions.update({
 	// 	scatter: {
 	// 		marker: {
@@ -66,7 +72,7 @@ var setDot = function(x, y, confidence) {
 	// 	}
 	// }, true);
 	chart.series[0].update({
-	    data: [[x, y]],
+	    data: [[valence, arousal]],
 	}, true);
 	chart.series[0].data[0].update({
 		marker: {
@@ -74,6 +80,23 @@ var setDot = function(x, y, confidence) {
 		},
 		color: hslToHex(confidence * 100, 100, 50)
 	});
+
+	var table = $('#history');
+	table.find('tr').each(function (i, row) {
+		var data;
+		if(i == 0) data = parseFloat(time).toFixed(1);
+		if(i == 1) data = parseFloat(confidence).toFixed(3);
+		if(i == 2) data = parseFloat(valence).toFixed(3);
+		if(i == 3) data = parseFloat(arousal).toFixed(3);
+
+		console.log(row.children);
+        for(var i = 1; i < row.children.length; i++){
+        	if(i == row.children.length - 1) row.children[i].innerHTML = data;
+        	else if(row.children[i+1].innerHTML != '') row.children[i].innerHTML = row.children[i+1].innerHTML;
+        }
+
+    });
+
 }
 
 var hslToHex = function(h, s, l) {

@@ -17,12 +17,7 @@
     , null, document.getElementsByTagName("head")[0]);
     a.theme= {
         colors:"#2b908f #90ee7e #f45b5b #7798BF #aaeeee #ff0066 #eeaaee #55BF3B #DF5353 #7798BF #aaeeee".split(" "), chart: {
-            backgroundColor: {
-                linearGradient: {
-                    x1: 0, y1: 0, x2: 1, y2: 1
-                }
-                , stops:[[0, "#262626"], [1, "#545454"]]
-            }
+            backgroundColor: "#262626"
             , style: {
                 fontFamily: "'Roboto Slab', sans-serif"
             }
