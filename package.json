@@ -1,0 +1,25 @@
+{
+  "name": "musi-6201-project",
+  "version": "1.0.0",
+  "description": "Real-time musical mood detection",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rytrose/MUSI-6201-Project.git"
+  },
+  "author": "Ryan Rose and Zach Kondak",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/rytrose/MUSI-6201-Project/issues"
+  },
+  "homepage": "https://github.com/rytrose/MUSI-6201-Project#readme",
+  "dependencies": {
+    "express": "^4.16.2",
+    "jquery": "^3.2.1",
+    "lodash": "^4.17.4",
+    "osc": "^2.2.0"
+  }
+}
