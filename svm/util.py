@@ -3,6 +3,9 @@ import numpy as np
 import os
 import cPickle as pickle
 import matplotlib.pyplot as plt
+import sys
+sys.path.append("/Users/admin/rrose37/MUSI-6201-Project/transfer_learning_music")
+import easy_feature_extraction
 
 PATH_TO_AUDIO = os.path.abspath(os.path.join('.', os.pardir)) + '/DEAM_audio'
 filenames = pickle.load( open( "full_one_sec/filename.p", "rb" ) )  # shape (song no)
@@ -208,7 +211,7 @@ def make_train_and_test_sets(num_train, num_test, path="train_test_sets/"):
         print "loaded " + str(i) + " of " + str(len(files))
 
     dir_name = "train-" + str(num_train) + "_test-" + str(num_test) + "/"
-    os.mkdir(path + dir_name)
+    os.mkdir(os.getcwd() + '/' + path + dir_name[:-1])
 
     pickle.dump(audio, open(path + dir_name + "audio.p", "wb"))
     pickle.dump(train_arousal_filenames, open(path + dir_name + "train_arousal_filenames.p", "wb"))
@@ -236,4 +239,49 @@ def calcMFCCs(audio):
              np.mean(ddmfcc, axis=1), np.std(ddmfcc, axis=1)), axis=0)
         final_feature.append(mfcc_feature)
 
+    return final_feature
+
+
+def calcConvnetFeatures(audio):
+    final_feature = []
+    feature_samples = 12000 * 29
+    feature_buffer = np.zeros(feature_samples)
+
+    for i in range(len(audio)):
+        print "On file " + str(i + 1) + " out of " + str(len(audio))
+        section = audio[i]
+        sample_index = 0
+        np_audio = librosa.core.resample(np.array(section), 22050, 12000)
+
+        while sample_index < len(np_audio):
+            # Audio left is less than 29s, repeat the chunk we have and predict
+            if len(np_audio[sample_index:len(np_audio)]) < len(feature_buffer):
+                feature_index = 0
+                while feature_index < len(feature_buffer):
+                    # Repeat the audio left
+                    end_index = min(feature_index + len(np_audio), len(feature_buffer)) - feature_index
+                    feature_buffer[feature_index:min(feature_index + len(np_audio), len(feature_buffer))] = np_audio[0:end_index]
+                    feature_index += len(np_audio)
+                # Predict
+                feature = easy_feature_extraction.extractFeatures(feature_buffer)
+                final_feature.append(feature)
+
+                # Reset feature_buffer
+                feature_buffer = np.zeros(feature_samples)
+
+            # Audio left is greater than 29s
+            else:
+                feature_buffer = np_audio[sample_index:sample_index + len(feature_buffer)]
+
+                # Predict
+                feature = easy_feature_extraction.extractFeatures(feature_buffer)
+                final_feature.append(feature)
+
+                # Reset feature_buffer
+                feature_buffer = np.zeros(feature_samples)
+
+            # Iterate
+            sample_index += len(feature_buffer)
+
+    pickle.dump(final_feature, open("train_test_sets/train-1_test-1/convnetFeatures.p", "wb"))
     return final_feature

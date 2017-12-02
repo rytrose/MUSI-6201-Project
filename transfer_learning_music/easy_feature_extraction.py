@@ -20,7 +20,6 @@ CHUNKSIZE = 1024
 if keras.__version__[0] != '1':
     raise RuntimeError('Keras version should be 1.x, maybe 1.2.2')
 
-
 def load_model(mid_idx):
     """Load one model and return it"""
     assert 0 <= mid_idx <= 4
@@ -117,7 +116,12 @@ def realtime():
         times.append(time.time() - t0)
         print("Time to extract convnet features: " + str(time.time() - t0))
         print np.concatenate(features, axis=0)
-        
+
+models = [load_model(mid_idx) for mid_idx in range(5)]  # for five models...
+
+def extractFeatures(predict_buffer):
+    features = [models[i].predict(predict_buffer[np.newaxis, np.newaxis, :ref_n_src])[0] for i in range(5)]
+    return features
 
 def calc(one_sec, num_secs):
     models = [load_model(mid_idx) for mid_idx in range(5)]  # for five models...

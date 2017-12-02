@@ -22,7 +22,7 @@ class Model:
         self.guiClient = OSC.OSCClient()
         self.guiClient.connect(('127.0.0.1', 57120))
 
-        self.audio = pickle.load( open( "train_test_sets/train-1_test-1/audio.p", "rb" ) )  # { songfile: [audiodata] }
+        # self.audio = pickle.load( open( "train_test_sets/train-1_test-1/audio.p", "rb" ) )  # { songfile: [audiodata] }
         print "loaded audio"
         self.train_arousal_filenames = pickle.load( open( "train_test_sets/train-1_test-1/train_arousal_filenames.p", "rb" ) )  # [filenames...]
         self.train_valence_filenames = pickle.load( open( "train_test_sets/train-1_test-1/train_valence_filenames.p", "rb" ) )  # [filenames...]
@@ -74,7 +74,7 @@ class Model:
         estimators = [('stdd', OptionalStandardScaler()), ('clf', SVR())]
         pipe = Pipeline(estimators)
         # cv should equal 10 by default according to transfer learning paper
-        num_examples = len(self.train_arousal_mfcc)
+        num_examples = len(features)
         subset_id = round(num_examples/10)# index for subset of data used for testing
 
         clf = GridSearchCV(pipe, params, cv=None, n_jobs=n_jobs, pre_dispatch='8*n_jobs', verbose=10)
