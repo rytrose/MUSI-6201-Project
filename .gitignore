@@ -2,8 +2,11 @@
 DEAM_annotations/
 DEAM_audio/
 svm/full_one_sec/
-svm/subset/ 
+svm/subset/
+svm/validate_convnet_features/
+svm/validate_sets/ 
 transfer_learning_music/.ipynb_checkpoints/
+svm/validate_convnet_models/
 svm/models_1/
 .idea/
 web/bower_components/

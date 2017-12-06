@@ -1,0 +1,1 @@
+convnet_half convnet_1 mfcc_4 convnet_8 mfcc_16 convnet_16

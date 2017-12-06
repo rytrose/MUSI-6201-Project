@@ -22,12 +22,23 @@ class Model:
         self.guiClient = OSC.OSCClient()
         self.guiClient.connect(('127.0.0.1', 57120))
 
-        # self.audio = pickle.load( open( "train_test_sets/train-1_test-1/audio.p", "rb" ) )  # { songfile: [audiodata] }
-        print "loaded audio"
+        self.audio = pickle.load( open( "train_test_sets/train-1_test-1/audio.p", "rb" ) )  # { songfile: [audiodata] }
+        print "loaded test audio"
         self.train_arousal_filenames = pickle.load( open( "train_test_sets/train-1_test-1/train_arousal_filenames.p", "rb" ) )  # [filenames...]
         self.train_valence_filenames = pickle.load( open( "train_test_sets/train-1_test-1/train_valence_filenames.p", "rb" ) )  # [filenames...]
         self.test_arousal_filenames = pickle.load( open( "train_test_sets/train-1_test-1/test_arousal_filenames.p", "rb" ) )  # [filenames...]
         self.test_valence_filenames = pickle.load( open( "train_test_sets/train-1_test-1/test_valence_filenames.p", "rb" ) )  # [filenames...]
+
+        self.validate_audio = pickle.load(open("validate_sets/train-2_test-2/audio.p", "rb"))
+        print "loaded validate audio"
+        self.validate_train_arousal_filenames = pickle.load(
+            open("validate_sets/train-2_test-2/train_arousal_filenames.p", "rb"))  # [filenames...]
+        self.validate_train_valence_filenames = pickle.load(
+            open("validate_sets/train-2_test-2/train_valence_filenames.p", "rb"))  # [filenames...]
+        self.validate_test_arousal_filenames = pickle.load(
+            open("validate_sets/train-2_test-2/test_arousal_filenames.p", "rb"))  # [filenames...]
+        self.validate_test_valence_filenames = pickle.load(
+            open("validate_sets/train-2_test-2/test_valence_filenames.p", "rb"))  # [filenames...]
 
         print "loaded filenames"
 
