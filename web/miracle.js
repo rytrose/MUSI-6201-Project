@@ -7,7 +7,7 @@ var port = new osc.WebSocketPort({
 
 port.on("message", function (oscMessage) {
     // Configure handlers here
-    
+    if(oscMessage.address == "/prediction") setDot(new Date().toString().split(" ")[4], oscMessage.args[0], oscMessage.args[1], oscMessage.args[2]);
 });
 
 port.open();

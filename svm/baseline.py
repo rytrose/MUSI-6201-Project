@@ -14,14 +14,6 @@ class OptionalStandardScaler(StandardScaler): # class taken from transfer learni
 
 class Model:
     def __init__(self):
-        self.guiServer = OSC.OSCServer(('127.0.0.1', 7100))
-        self.guiServerThread = threading.Thread(target=self.guiServer.serve_forever)
-        self.guiServerThread.daemon = False
-        self.guiServerThread.start()
-
-        self.guiClient = OSC.OSCClient()
-        self.guiClient.connect(('127.0.0.1', 57120))
-
         self.audio = pickle.load( open( "train_test_sets/train-1_test-1/audio.p", "rb" ) )  # { songfile: [audiodata] }
         print "loaded test audio"
         self.train_arousal_filenames = pickle.load( open( "train_test_sets/train-1_test-1/train_arousal_filenames.p", "rb" ) )  # [filenames...]
@@ -41,15 +33,6 @@ class Model:
             open("validate_sets/train-2_test-2/test_valence_filenames.p", "rb"))  # [filenames...]
 
         print "loaded filenames"
-
-    def sendOSCMessage(self, addr, *msgArgs):
-        msg = OSC.OSCMessage()
-        msg.setAddress(addr)
-        msg.append(*msgArgs)
-        self.guiClient.send(msg)
-
-    def sendPrediction(self, valence, arousal, confidence):
-        self.sendOSCMessage("/setPrediction", [valence, arousal, confidence])
 
     def baseline(self):
         # split the audio and assign appropriate labels
