@@ -210,17 +210,17 @@ class Predictor(Process):
             else:
                 while np.shape(audio)[0] < SR * 29:
                     audio = np.concatenate((audio, audio), axis=0)
+                if self.model_name == "convnet_4":
+                    print np.mean(np.abs(audio))
                 feature = [np.array(extractFeatures(audio, self.convnets)).flatten()]
                 print self.model_name
 
             valence = self.valence_model.predict(feature)
             arousal = self.arousal_model.predict(feature)
-            if self.model_name == "convnet_4":
-                print "valence", valence
 
             prediction = self.predictions[self.model_name]
-            prediction[0] = valence[0]
-            prediction[1] = arousal[0]
+            prediction[0] = random.random() #valence[0]
+            prediction[1] = random.random() arousal[0]
             self.predictions[self.model_name] = prediction
 
 if __name__ == '__main__':
