@@ -1,18 +1,50 @@
+DEMO = True
+
 import pyaudio
 import OSC
 import numpy as np
-from util import *
 import threading
 from multiprocessing.dummy import Process
 import os
 import pickle
 import time
 import librosa
-from easy_feature_extraction import extractFeatures, load_model
+
+if not DEMO:
+    print "Loading convnet feature extraction"
+    from util import *
+    from easy_feature_extraction import extractFeatures, load_model
 
 SR = 22050
 CHUNKSIZE = SR/2
 
+# These are required in this file as to not require importing util, which
+#  loads the convnet models (can't be run for demo)
+if DEMO:
+    from sklearn.preprocessing import StandardScaler
+
+    # Calculates the MFCC feature for a list of chunks of audio
+    class OptionalStandardScaler(StandardScaler): # class taken from transfer learning paper
+        def __init__(self, on=False):
+            super(OptionalStandardScaler, self).__init__(with_mean=True, with_std=True)
+
+    def calcMFCCs(audio):
+        final_feature = []
+        for section in audio:
+            mfcc = librosa.feature.mfcc(np.array(section), 22050, n_mfcc=20)
+            dmfcc = mfcc[:, 1:] - mfcc[:, :-1]
+            ddmfcc = dmfcc[:, 1:] - dmfcc[:, :-1]
+            mfcc_feature = np.concatenate(
+                (np.mean(mfcc, axis=1), np.std(mfcc, axis=1),  # mfcc feature taken from transfer learning paper
+                 np.mean(dmfcc, axis=1), np.std(dmfcc, axis=1),
+                 np.mean(ddmfcc, axis=1), np.std(ddmfcc, axis=1)), axis=0)
+            final_feature.append(mfcc_feature)
+
+        return final_feature
+
+################################
+# Realtime Mood Detection Class
+################################
 class Realtime():
     def __init__(self, final_model_aro, final_model_val):
 
@@ -33,7 +65,10 @@ class Realtime():
         self.arousal_selected_features = open('hypermodel_arousal_mse_delay/input_model_names.txt', 'rb').read().split(" ")
         self.valence_selected_features = open('hypermodel_valence_mse_delay/input_model_names.txt', 'rb').read().split(" ")
 
-        all_feats = list(set(self.arousal_selected_features + self.valence_selected_features))
+        if not DEMO:
+            all_feats = list(set(self.arousal_selected_features + self.valence_selected_features))
+        else:
+            all_feats = ['mfcc_half', 'mfcc_2', 'mfcc_4', 'mfcc_8', 'mfcc_16']
 
         for model_name in all_feats:
             print "loading", model_name
@@ -52,7 +87,10 @@ class Realtime():
         self.final_arousal_model = pickle.load(open(final_model_aro, "rb"))
         self.final_valence_model = pickle.load(open(final_model_val, "rb"))
 
+        # Start collecting audio
         self.audio_thread.start()
+
+        # Start making predictions
         [convnet_predictor_thread.start() for convnet_predictor_thread in self.convnet_predictor_threads]
         [mfcc_predictor_thread.start() for mfcc_predictor_thread in self.mfcc_predictor_threads]
 
@@ -150,11 +188,13 @@ class Predictor(Process):
         self.model_name = model_name
         self.audio_buffer = audio_buffer
         self.predictions = predictions
-        self.convnets = [load_model(mid_idx) for mid_idx in range(5)]
         self.daemon = True
 
         split_name = model_name.split("_")
         self.model_type = split_name[0]
+        if self.model_type == "convnet":
+            self.convnets = [load_model(mid_idx) for mid_idx in range(5)]
+
         self.length = 0.5 if split_name[1] == "half" else float(split_name[1])
 
         # Load models
