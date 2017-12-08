@@ -1,4 +1,4 @@
-DEMO = True
+DEMO = False
 
 import pyaudio
 import OSC
@@ -87,9 +87,6 @@ class Realtime():
         self.final_arousal_model = pickle.load(open(final_model_aro, "rb"))
         self.final_valence_model = pickle.load(open(final_model_val, "rb"))
 
-        # Start collecting audio
-        self.audio_thread.start()
-
         # Start making predictions
         [convnet_predictor_thread.start() for convnet_predictor_thread in self.convnet_predictor_threads]
         [mfcc_predictor_thread.start() for mfcc_predictor_thread in self.mfcc_predictor_threads]
@@ -125,10 +122,15 @@ class Realtime():
             arousal = self.final_arousal_model.predict([final_arousal_feature])
             confidence = 1 - (0.5 * np.std(np.array(final_arousal_feature)) + 0.5 * np.std(np.array(final_valence_feature)))
 
-            time.sleep(0.25)
             #print valence, arousal, confidence
 
             self.sendOSCMessage("/prediction", guiClient, [valence[0], arousal[0], confidence])
+            self.audio_thread.update_audio()
+
+        # close stream
+        self.audio_thread.stream.stop_stream()
+        self.audio_thread.stream.close()
+        self.audio_thread.audio_client.terminate()
 
 
     def sendOSCMessage(self, addr, guiClient, *msgArgs):
@@ -137,9 +139,8 @@ class Realtime():
         msg.append(*msgArgs)
         guiClient.send(msg)
 
-class Audio(Process):
+class Audio():
     def __init__(self, audio_buffer):
-        Process.__init__(self)
 
         self.audio_buffer = audio_buffer
         self.daemon = True
@@ -147,40 +148,37 @@ class Audio(Process):
         # initialize portaudio
         self.audio_client = pyaudio.PyAudio()
 
-    def run(self):
-        stream = self.audio_client.open(format=pyaudio.paFloat32, channels=1, rate=SR, input=True, frames_per_buffer=CHUNKSIZE)
+        self.stream = self.audio_client.open(format=pyaudio.paFloat32, channels=1, rate=SR, input=True,
+                                        frames_per_buffer=CHUNKSIZE)
 
         # Do this as long as you want fresh samples
-        data = stream.read(CHUNKSIZE, exception_on_overflow=False)
+        self.data = self.stream.read(CHUNKSIZE, exception_on_overflow=False)
 
-        samples_in_buffer = 0
+        self.samples_in_buffer = 0
 
-        while data != '':
-            numpydata = np.fromstring(data, dtype=np.float32)
+    def update_audio(self):
 
-            if samples_in_buffer < len(self.audio_buffer):
-                # Continue to fill the audio buffer until 16s worth of audio is collected
-                if samples_in_buffer + len(numpydata) > len(self.audio_buffer):
-                    # Adding all of this data would make more than 16s
-                    samples_extra = samples_in_buffer + len(numpydata) - len(self.audio_buffer)
-                    self.audio_buffer[:len(self.audio_buffer) - samples_extra] = self.audio_buffer[len(self.audio_buffer) - samples_in_buffer:]
-                    self.audio_buffer[len(self.audio_buffer) - len(numpydata):] = numpydata
-                    samples_in_buffer = len(self.audio_buffer)
-                else:
-                    # Adding this data doesn't hit 16s (or is exactly 16s)
-                    self.audio_buffer[len(self.audio_buffer) - (samples_in_buffer + len(numpydata)):len(self.audio_buffer) - samples_in_buffer] = numpydata
-                    samples_in_buffer += len(numpydata)
-            else:
-                # Keep the most recent 16s
-                self.audio_buffer[:len(self.audio_buffer) - len(numpydata)] = self.audio_buffer[len(numpydata):]
+        numpydata = np.fromstring(self.data, dtype=np.float32)
+
+        if self.samples_in_buffer < len(self.audio_buffer):
+            # Continue to fill the audio buffer until 16s worth of audio is collected
+            if self.samples_in_buffer + len(numpydata) > len(self.audio_buffer):
+                # Adding all of this data would make more than 16s
+                samples_extra = self.samples_in_buffer + len(numpydata) - len(self.audio_buffer)
+                self.audio_buffer[:len(self.audio_buffer) - samples_extra] = self.audio_buffer[len(self.audio_buffer) - self.samples_in_buffer:]
                 self.audio_buffer[len(self.audio_buffer) - len(numpydata):] = numpydata
+                samples_in_buffer = len(self.audio_buffer)
+            else:
+                # Adding this data doesn't hit 16s (or is exactly 16s)
+                self.audio_buffer[len(self.audio_buffer) - (self.samples_in_buffer + len(numpydata)):len(self.audio_buffer) - self.samples_in_buffer] = numpydata
+                self.samples_in_buffer += len(numpydata)
+        else:
+            # Keep the most recent 16s
+            self.audio_buffer[:len(self.audio_buffer) - len(numpydata)] = self.audio_buffer[len(numpydata):]
+            self.audio_buffer[len(self.audio_buffer) - len(numpydata):] = numpydata
 
-            data = stream.read(CHUNKSIZE, exception_on_overflow=False)
+        data = self.stream.read(CHUNKSIZE, exception_on_overflow=False)
 
-        # close stream
-        stream.stop_stream()
-        stream.close()
-        self.audio_client.terminate()
 
 class Predictor(Process):
     def __init__(self, model_name, arousal_model_filename, valence_model_filename, audio_buffer, predictions):
@@ -205,20 +203,20 @@ class Predictor(Process):
         while True:
             samples_desired = int(self.length * SR)
             audio = np.array(self.audio_buffer[len(self.audio_buffer) - samples_desired:])
-            audio = librosa.core.resample(np.array(audio), 22050, 12000)
-            failed = False
-            go = False
+            audio = librosa.core.resample(np.array(audio), SR, 12000)
 
             if self.model_type == "mfcc":
                 feature = calcMFCCs([audio])
             else:
-                while np.shape(audio)[0] < 348000:
+                while np.shape(audio)[0] < SR * 29:
                     audio = np.concatenate((audio, audio), axis=0)
                 feature = [np.array(extractFeatures(audio, self.convnets)).flatten()]
                 print self.model_name
 
             valence = self.valence_model.predict(feature)
             arousal = self.arousal_model.predict(feature)
+            if self.model_name == "convnet_4":
+                print "valence", valence
 
             self.predictions[self.model_name][0] = valence[0]
             self.predictions[self.model_name][1] = arousal[0]
