@@ -266,7 +266,6 @@ def calcConvnetFeatures(audio):
     feature_buffer = np.zeros(feature_samples)
 
     for i in range(len(audio)):
-        print "On file " + str(i + 1) + " out of " + str(len(audio))
         section = audio[i]
         sample_index = 0
         np_audio = librosa.core.resample(np.array(section), 22050, 12000)
@@ -281,6 +280,7 @@ def calcConvnetFeatures(audio):
                     feature_buffer[feature_index:min(feature_index + len(np_audio), len(feature_buffer))] = np_audio[0:end_index]
                     feature_index += len(np_audio)
                 # Predict
+                #print "FEAT BUFF", np.shape(feature_buffer)
                 feature = easy_feature_extraction.extractFeatures(feature_buffer)
                 final_feature.append(feature)
 

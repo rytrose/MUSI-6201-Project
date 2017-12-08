@@ -117,9 +117,9 @@ def realtime():
         print("Time to extract convnet features: " + str(time.time() - t0))
         print np.concatenate(features, axis=0)
 
-models = [load_model(mid_idx) for mid_idx in range(5)]  # for five models...
+# models = [load_model(mid_idx) for mid_idx in range(5)]  # for five models...
 
-def extractFeatures(predict_buffer):
+def extractFeatures(predict_buffer, models):
     features = [models[i].predict(predict_buffer[np.newaxis, np.newaxis, :ref_n_src])[0] for i in range(5)]
     return features
 

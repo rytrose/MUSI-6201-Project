@@ -9,6 +9,7 @@ transfer_learning_music/.ipynb_checkpoints/
 svm/validate_convnet_models/
 svm/models_1/
 .idea/
+node_modules/
 web/bower_components/
 svm/.ipynb_checkpoints
 *.pyc

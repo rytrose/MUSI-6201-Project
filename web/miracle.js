@@ -16,7 +16,7 @@ chart = new Highcharts.chart('graph', {
     chart: {
         type: 'scatter',
         animation: {
-        	duration: 200
+        	duration: 500
         }
     },
     title: {
