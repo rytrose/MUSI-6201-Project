@@ -1,51 +1,20 @@
-DEMO = False
-
 import pyaudio
 import OSC
 import numpy as np
 import threading
-from multiprocessing.dummy import Process, Manager
+from multiprocessing import Process, Manager
 import os
 import pickle
 import time
 import librosa
 import random
-
-if not DEMO:
-    print "Loading convnet feature extraction"
-    from util import *
-    from easy_feature_extraction import extractFeatures, load_model
+from util import *
+from easy_feature_extraction import extractFeatures, load_model
 
 SR = 22050
 CHUNKSIZE = SR/2
 
-# These are required in this file as to not require importing util, which
-#  loads the convnet models (can't be run for demo)
-if DEMO:
-    from sklearn.preprocessing import StandardScaler
 
-    # Calculates the MFCC feature for a list of chunks of audio
-    class OptionalStandardScaler(StandardScaler): # class taken from transfer learning paper
-        def __init__(self, on=False):
-            super(OptionalStandardScaler, self).__init__(with_mean=True, with_std=True)
-
-    def calcMFCCs(audio):
-        final_feature = []
-        for section in audio:
-            mfcc = librosa.feature.mfcc(np.array(section), 22050, n_mfcc=20)
-            dmfcc = mfcc[:, 1:] - mfcc[:, :-1]
-            ddmfcc = dmfcc[:, 1:] - dmfcc[:, :-1]
-            mfcc_feature = np.concatenate(
-                (np.mean(mfcc, axis=1), np.std(mfcc, axis=1),  # mfcc feature taken from transfer learning paper
-                 np.mean(dmfcc, axis=1), np.std(dmfcc, axis=1),
-                 np.mean(ddmfcc, axis=1), np.std(ddmfcc, axis=1)), axis=0)
-            final_feature.append(mfcc_feature)
-
-        return final_feature
-
-################################
-# Realtime Mood Detection Class
-################################
 class Realtime():
     def __init__(self, final_model_aro, final_model_val, audio_buffer, predictions):
 
@@ -66,10 +35,7 @@ class Realtime():
         self.arousal_selected_features = open('hypermodel_arousal_mse_delay/input_model_names.txt', 'rb').read().split(" ")
         self.valence_selected_features = open('hypermodel_valence_mse_delay/input_model_names.txt', 'rb').read().split(" ")
 
-        if not DEMO:
-            all_feats = list(set(self.arousal_selected_features + self.valence_selected_features))
-        else:
-            all_feats = ['mfcc_half', 'mfcc_2', 'mfcc_4', 'mfcc_8', 'mfcc_16']
+        all_feats = list(set(self.arousal_selected_features + self.valence_selected_features))
 
         for model_name in all_feats:
             print "loading", model_name
@@ -78,10 +44,10 @@ class Realtime():
             valence_model_filename = 'MODEL_valence_' + model_name + "_seconds.sav"
             self.predictions[model_name] = [0, 0]
             if feat_type == "mfcc":
-                self.mfcc_predictor_threads.append(Predictor(model_name, arousal_model_filename, valence_model_filename,
+                self.mfcc_predictor_threads.append(MFCCPredictor(model_name, arousal_model_filename, valence_model_filename,
                                                         self.audio_buffer, self.predictions))
             else:
-                self.convnet_predictor_threads.append(Predictor(model_name, arousal_model_filename, valence_model_filename,
+                self.convnet_predictor_threads.append(ConvnetPredictor(model_name, arousal_model_filename, valence_model_filename,
                                                            self.audio_buffer, self.predictions))
 
         # Initialize final model
@@ -92,9 +58,10 @@ class Realtime():
         [convnet_predictor_thread.start() for convnet_predictor_thread in self.convnet_predictor_threads]
         [mfcc_predictor_thread.start() for mfcc_predictor_thread in self.mfcc_predictor_threads]
 
-        print "Done init"
+        print "Finished init..."
 
     def run(self):
+
         # Initialize OSC
         guiServer = OSC.OSCServer(('127.0.0.1', 7100))
         guiServerThread = Process(target=guiServer.serve_forever)
@@ -104,13 +71,18 @@ class Realtime():
         guiClient = OSC.OSCClient()
         guiClient.connect(('127.0.0.1', 6000))
 
-        print "I AM RUNNING"
+        print "Running..."
+
+        time_since_end_of_loop = time.time()
         while True:
+            start = time.time()
+            print "Time between main loops: " + str(start - time_since_end_of_loop)
+
             # Predict and send to the front end
             final_valence_feature = []
             final_arousal_feature = []
 
-            for model_name in self.predictions:
+            for model_name in set(self.valence_selected_features + self.arousal_selected_features):
                 if model_name in self.valence_selected_features:
                     prediction = self.predictions[model_name]
                     final_valence_feature.append(prediction[0])
@@ -119,14 +91,24 @@ class Realtime():
                     prediction = self.predictions[model_name]
                     final_arousal_feature.append(prediction[1])
 
+            time_to_gather_predictions = time.time()
+            print "Time to gather predictions: " + str(time_to_gather_predictions - start)
+
             valence = self.final_valence_model.predict([final_valence_feature])
             arousal = self.final_arousal_model.predict([final_arousal_feature])
             confidence = 1 - (0.5 * np.std(np.array(final_arousal_feature)) + 0.5 * np.std(np.array(final_valence_feature)))
+
+            time_to_predict_from_hypermodel = time.time()
+            print "Time to predict from hypermodel: " + str(time_to_predict_from_hypermodel - time_to_gather_predictions)
 
             #print valence, arousal, confidence
 
             self.sendOSCMessage("/prediction", guiClient, [valence[0], arousal[0], confidence])
             self.audio_thread.update_audio()
+
+            time_to_update_audio = time.time()
+            print "Time to update audio: " + str(time_to_update_audio - time_to_predict_from_hypermodel)
+            time_since_end_of_loop = time.time()
 
         # close stream
         self.audio_thread.stream.stop_stream()
@@ -139,6 +121,7 @@ class Realtime():
         msg.setAddress(addr)
         msg.append(*msgArgs)
         guiClient.send(msg)
+
 
 class Audio():
     def __init__(self, audio_buffer):
@@ -181,9 +164,10 @@ class Audio():
         self.data = self.stream.read(CHUNKSIZE, exception_on_overflow=False)
 
 
-class Predictor(Process):
+class MFCCPredictor(threading.Thread):
     def __init__(self, model_name, arousal_model_filename, valence_model_filename, audio_buffer, predictions):
-        Process.__init__(self)
+        threading.Thread.__init__(self)
+
         self.model_name = model_name
         self.audio_buffer = audio_buffer
         self.predictions = predictions
@@ -191,8 +175,6 @@ class Predictor(Process):
 
         split_name = model_name.split("_")
         self.model_type = split_name[0]
-        if self.model_type == "convnet":
-            self.convnets = [load_model(mid_idx) for mid_idx in range(5)]
 
         self.length = 0.5 if split_name[1] == "half" else float(split_name[1])
 
@@ -206,13 +188,45 @@ class Predictor(Process):
             audio = np.array(self.audio_buffer[len(self.audio_buffer) - samples_desired:])
             audio = librosa.core.resample(np.array(audio), SR, 12000)
 
-            if self.model_type == "mfcc":
-                feature = calcMFCCs([audio])
-            else:
-                while np.shape(audio)[0] < SR * 29:
-                    audio = np.concatenate((audio, audio), axis=0)
-                feature = [np.array(extractFeatures(audio, self.convnets)).flatten()]
-                print self.model_name
+            feature = calcMFCCs([audio])
+
+            valence = self.valence_model.predict(feature)
+            arousal = self.arousal_model.predict(feature)
+
+            prediction = self.predictions[self.model_name]
+            prediction[0] = valence[0]
+            prediction[1] = arousal[0]
+            self.predictions[self.model_name] = prediction
+
+
+class ConvnetPredictor(Process):
+    def __init__(self, model_name, arousal_model_filename, valence_model_filename, audio_buffer, predictions):
+        Process.__init__(self)
+        self.model_name = model_name
+        self.audio_buffer = audio_buffer
+        self.predictions = predictions
+        self.daemon = True
+
+        split_name = model_name.split("_")
+        self.model_type = split_name[0]
+        self.convnets = [load_model(mid_idx) for mid_idx in range(5)]
+
+        self.length = 0.5 if split_name[1] == "half" else float(split_name[1])
+
+        # Load models
+        self.arousal_model = pickle.load(open(self.model_type + "_models/" + arousal_model_filename, "rb"))
+        self.valence_model = pickle.load(open(self.model_type + "_models/" + valence_model_filename, "rb"))
+
+    def run(self):
+        while True:
+            samples_desired = int(self.length * SR)
+            audio = np.array(self.audio_buffer[len(self.audio_buffer) - samples_desired:])
+            audio = librosa.core.resample(np.array(audio), SR, 12000)
+
+            while np.shape(audio)[0] < SR * 29:
+                audio = np.concatenate((audio, audio), axis=0)
+            feature = [np.array(extractFeatures(audio, self.convnets)).flatten()]
+            print self.model_name
 
             valence = self.valence_model.predict(feature)
             arousal = self.arousal_model.predict(feature)
