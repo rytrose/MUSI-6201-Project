@@ -4,7 +4,7 @@ import pyaudio
 import OSC
 import numpy as np
 import threading
-from multiprocessing.dummy import Process
+from multiprocessing.dummy import Process, Manager
 import os
 import pickle
 import time
@@ -46,13 +46,13 @@ if DEMO:
 # Realtime Mood Detection Class
 ################################
 class Realtime():
-    def __init__(self, final_model_aro, final_model_val):
+    def __init__(self, final_model_aro, final_model_val, audio_buffer, predictions):
 
         # Initalize an empty 16s buffer for audio
-        self.audio_buffer = np.zeros(SR * 16)
+        self.audio_buffer = audio_buffer
 
         # Will contain predictions from each model
-        self.predictions = {}
+        self.predictions = predictions
 
         # Initialize audio thread
         self.audio_thread = Audio(self.audio_buffer)
@@ -218,9 +218,15 @@ class Predictor(Process):
             if self.model_name == "convnet_4":
                 print "valence", valence
 
-            self.predictions[self.model_name][0] = valence[0]
-            self.predictions[self.model_name][1] = arousal[0]
+            prediction = self.predictions[self.model_name]
+            prediction[0] = valence[0]
+            prediction[1] = arousal[0]
+            self.predictions[self.model_name] = prediction
 
-main = Realtime("hypermodel_arousal_mse_delay/hypermodel.sav", "hypermodel_valence_mse_delay/hypermodel.sav")
-print "Starting main"
-main.run()
+if __name__ == '__main__':
+    manager = Manager()
+    audio_buffer = manager.list([0 for i in range(SR * 16)])
+    predictions = manager.dict()
+    main = Realtime("hypermodel_arousal_mse_delay/hypermodel.sav", "hypermodel_valence_mse_delay/hypermodel.sav", audio_buffer, predictions)
+    print "Starting main"
+    main.run()
