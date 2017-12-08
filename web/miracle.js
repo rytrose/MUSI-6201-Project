@@ -84,7 +84,7 @@ var setDot = function(time, valence, arousal, confidence) {
 	var table = $('#history');
 	table.find('tr').each(function (i, row) {
 		var data;
-		if(i == 0) data = parseFloat(time).toFixed(1);
+		if(i == 0) data = time;
 		if(i == 1) data = parseFloat(confidence).toFixed(3);
 		if(i == 2) data = parseFloat(valence).toFixed(3);
 		if(i == 3) data = parseFloat(arousal).toFixed(3);
